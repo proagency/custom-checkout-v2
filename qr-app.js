@@ -171,24 +171,32 @@
         <div id="am-status" class="am-status"></div>
 
         <div id="am-qr-section" class="am-qr-section am-hidden">
-          <!-- Skeleton for QR -->
-          <div id="am-qr-skeleton" class="am-qr-skeleton">
-            <div class="am-skeleton-box"></div>
-            <div class="am-skeleton-line"></div>
-            <div class="am-skeleton-line am-skeleton-line--short"></div>
-          </div>
+  <!-- Skeleton for QR -->
+  <div id="am-qr-skeleton" class="am-qr-skeleton">
+    <div class="am-skeleton-box"></div>
+    <div class="am-skeleton-line"></div>
+    <div class="am-skeleton-line am-skeleton-line--short"></div>
+  </div>
 
-          <!-- Actual QR content -->
-          <div id="am-qr-content" class="am-qr-content am-hidden">
-            <div id="am-qr-img"></div>
-            <div class="am-order-row">
-              <span id="am-order-id-label">Order ID: <span id="am-order-id"></span></span>
-              <button type="button" id="am-copy-order" class="am-icon-btn" title="Copy Order ID">
-                <i class="fa-solid fa-copy"></i>
-              </button>
-            </div>
-          </div>
-        </div>
+  <!-- Actual QR content -->
+  <div id="am-qr-content" class="am-qr-content am-hidden">
+    <div id="am-qr-img"></div>
+    <div class="am-order-row">
+      <span id="am-order-id-label">Order ID: <span id="am-order-id"></span></span>
+      <button type="button" id="am-copy-order" class="am-icon-btn" title="Copy Order ID">
+        <i class="fa-solid fa-copy"></i>
+      </button>
+    </div>
+
+    <!-- 🔻 New actions row with Download QR button -->
+    <div class="am-qr-actions">
+      <button type="button" id="am-download-qr" class="am-secondary-btn">
+        <i class="fa-solid fa-download"></i> Download QR
+      </button>
+    </div>
+  </div>
+</div>
+
       </div>
     `;
 
@@ -218,6 +226,7 @@
     const orderIdSpan = root.querySelector("#am-order-id");
     const orderIdLabel = root.querySelector("#am-order-id-label");
     const copyOrderBtn = root.querySelector("#am-copy-order");
+    const downloadQrBtn = root.querySelector("#am-download-qr"); 
 
     let selectedChannelType = "ewallet";
     let selectedChannel = null;
@@ -305,6 +314,30 @@
         setStatus("Unable to copy Order ID. Please copy manually.", "error");
       }
     });
+
+    // Download QR
+downloadQrBtn.addEventListener("click", () => {
+  if (!qrContainer) return;
+  const canvas = qrContainer.querySelector("canvas");
+  if (!canvas) {
+    setStatus("QR is not ready to download yet.", "error");
+    return;
+  }
+
+  try {
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = `qr-${currentOrderId || "payment"}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setStatus("QR downloaded as image.", "success");
+  } catch (e) {
+    console.error(e);
+    setStatus("Unable to download QR. Please long-press / right-click to save.", "error");
+  }
+});
+
 
     // Pay via QR Now click
     payBtn.addEventListener("click", async () => {
@@ -486,3 +519,4 @@
     document.addEventListener("DOMContentLoaded", start);
   }
 })();
+
