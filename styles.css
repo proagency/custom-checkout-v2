@@ -1,0 +1,354 @@
+html {
+    scroll-behavior: smooth;
+}
+
+/* Hide default payment UI */
+.form-payment div .payment-content {
+    display: none !important;
+}
+
+/* Scope everything to the new payment root */
+#am-payment-root {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    margin-top: 16px;
+}
+
+/* Card container: no border, no shadow, 4px radius */
+#am-payment-root .am-card {
+    padding: 14px 2px;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+ /* blend into native UI */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Title + subtitle */
+#am-payment-root .am-title {
+    font-size: 15px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 4px;
+    color: #0f172a;
+}
+
+#am-payment-root .am-title i {
+    font-size: 16px;
+}
+
+#am-payment-root .am-subtitle {
+    font-size: 12px;
+    margin: 0 0 12px;
+    color: #64748b;
+}
+
+/* Toggle buttons (eWallet / Bank Transfer) */
+#am-payment-root .am-toggle-group {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+#am-payment-root .am-toggle-btn {
+    flex: 1;
+    border-radius: 4px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    font-size: 12px;
+    padding: 12px 10px;
+ /* channel type padding */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+#am-payment-root .am-toggle-btn i {
+    font-size: 13px;
+}
+
+#am-payment-root .am-toggle-btn--active {
+    background: #0f172a;
+    color: #f9fafb;
+    border-color: #0f172a;
+}
+
+/* Channel options: stacked, no icons */
+#am-payment-root .am-channel-group {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+#am-payment-root .am-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+    padding: 12px 10px;
+ /* input-like padding */
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: #f8fafc;
+}
+
+#am-payment-root .am-option:hover {
+    border-color: #cbd5e1;
+    background: #f1f5f9;
+}
+
+#am-payment-root .am-option input[type="radio"] {
+    accent-color: #0f172a;
+}
+
+#am-payment-root .am-option span {
+    display: inline-flex;
+    align-items: center;
+    font-size: 12px;
+    color: #0f172a;
+}
+
+/* Buttons */
+#am-payment-root .am-primary-btn,
+#am-payment-root .am-secondary-btn {
+    border-radius: 4px;
+    font-size: 18px;
+    font-weight: 700;
+    padding: 14px 10px;
+ /* button padding */
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+/* Pay via QR Now - full width */
+#am-payment-root .am-primary-btn {
+    background: #0f172a;
+    color: #f9fafb;
+    width: 100%;
+    justify-content: center;
+    box-shadow: none;
+}
+
+#am-payment-root .am-primary-btn:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+}
+
+#am-payment-root .am-primary-btn:not(:disabled):hover {
+    background: #020617;
+}
+
+/* Secondary buttons */
+#am-payment-root .am-secondary-btn {
+    background: #e2e8f0;
+    color: #0f172a;
+    box-shadow: none;
+}
+
+#am-payment-root .am-secondary-btn:hover {
+    background: #cbd5e1;
+}
+
+/* Icon-only button */
+#am-payment-root .am-icon-btn {
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 3px 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    transition: all 0.15s ease;
+}
+
+#am-payment-root .am-icon-btn:hover {
+    color: #0f172a;
+}
+
+/* Status text */
+#am-payment-root .am-status {
+    font-size: 11px;
+    margin-top: 6px;
+    color: #64748b;
+}
+
+#am-payment-root .am-status--error {
+    color: #b91c1c;
+}
+
+/* QR section (for real QR + order info) */
+#am-payment-root .am-qr-section {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* ========================= */
+/* Channel + button skeleton */
+/* ========================= */
+
+#am-payment-root .am-channel-skeleton {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0 auto 14px;
+}
+
+/* Big bar where eWallet/Bank toggle would be */
+#am-payment-root .am-channel-toggle-skel {
+    height: 44px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #e2e8f0, #f8fafc, #e2e8f0);
+    background-size: 200% 100%;
+    animation: am-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+/* Two stacked option rows (GCash / Maya) */
+#am-payment-root .am-channel-line {
+    height: 40px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+}
+
+/* Full-width button (Pay via QR Now) */
+#am-payment-root .am-channel-btn {
+    height: 44px;
+    border-radius: 4px;
+    background: #cbd5e1;
+}
+
+/* ================= */
+/* QR area skeleton  */
+/* ================= */
+
+#am-payment-root .am-qr-skeleton {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-width: 260px;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    min-height: 260px;
+    margin: 0 auto;
+}
+
+#am-payment-root .am-skeleton-box {
+    width: 100%;
+    max-width: 240px;
+    height: 240px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #e2e8f0, #f8fafc, #e2e8f0);
+    background-size: 200% 100%;
+    animation: am-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+#am-payment-root .am-skeleton-line {
+    width: 80%;
+    height: 10px;
+    border-radius: 4px;
+    background: #e2e8f0;
+}
+
+#am-payment-root .am-skeleton-line--short {
+    max-width: 60%;
+}
+
+/* QR content */
+#am-payment-root .am-qr-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+}
+
+/* QR container: white canvas with quiet space */
+#am-payment-root #am-qr-img {
+    width: 100%;
+    max-width: 280px;
+    padding: 10px;
+          /* quiet zone around QR */
+    border-radius: 4px;
+    background: #ffffff;
+    /* white canvas */
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+#am-payment-root #am-qr-img canvas {
+    width: 100% !important;
+    height: auto !important;
+}
+
+/* Centered Order ID row */
+#am-payment-root .am-order-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 11px;
+    color: #0f172a;
+    text-align: center;
+    width: 100%;
+}
+
+#am-payment-root .am-qr-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+}
+
+/* Helpers */
+#am-payment-root .am-hidden {
+    display: none !important;
+}
+
+#am-payment-root .am-inline {
+    display: inline-flex !important;
+}
+
+@keyframes am-skeleton-shimmer {
+    0% {
+        background-position: 0% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+#am-payment-root .am-banner {
+    margin-top: 10px;
+}
+
+#am-payment-root .am-banner img {
+    display: block;
+    padding: 0 40px;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 4px;
+}
