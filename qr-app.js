@@ -1,17 +1,21 @@
-(function () {
-  // === CONFIG FROM <script> TAG ===========================================
-  const currentScript = document.currentScript || (function () {
-    const scripts = document.getElementsByTagName("script");
-    return scripts[scripts.length - 1];
-  })();
+// === CONFIG FROM <script> TAG ===========================================
+  const currentScript =
+    document.currentScript ||
+    (function () {
+      const scripts = document.getElementsByTagName("script");
+      return scripts[scripts.length - 1];
+    })();
 
   const CONFIG = {
-    webhookUrl: currentScript && currentScript.dataset.amWebhookUrl
-      ? currentScript.dataset.amWebhookUrl.trim()
-      : null,
-    staticCode: currentScript && currentScript.dataset.amStaticCode
-      ? currentScript.dataset.amStaticCode.trim()
-      : null,
+    webhookUrl:
+      currentScript && currentScript.dataset.amWebhookUrl
+        ? currentScript.dataset.amWebhookUrl.trim()
+        : null,
+    // If data-am-static-code is NOT provided, fall back to DEFAULT_STATIC_CODE
+    staticCode:
+      currentScript && currentScript.dataset.amStaticCode
+        ? currentScript.dataset.amStaticCode.trim()
+        : DEFAULT_STATIC_CODE,
     debug: currentScript && currentScript.dataset.amDebug === "1"
   };
 
@@ -59,7 +63,8 @@
     var tempDiv = document.createElement("div");
     container.appendChild(tempDiv);
 
-    var qr = new QRCode(tempDiv, {
+    // Base QR
+    new QRCode(tempDiv, {
       text: text,
       width: size,
       height: size,
@@ -68,6 +73,7 @@
       correctLevel: QRCode.CorrectLevel.M
     });
 
+    // Wrap into a larger white canvas for quiet margin
     setTimeout(function () {
       var innerCanvas = tempDiv.querySelector("canvas");
       var innerImg = tempDiv.querySelector("img");
@@ -187,6 +193,12 @@
                 <i class="fa-solid fa-copy"></i>
               </button>
             </div>
+            <div class="am-qr-actions">
+              <button type="button" id="am-download-qr" class="am-secondary-btn">
+                <i class="fa-solid fa-download"></i>
+                Download QR
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -218,6 +230,7 @@
     const orderIdSpan = root.querySelector("#am-order-id");
     const orderIdLabel = root.querySelector("#am-order-id-label");
     const copyOrderBtn = root.querySelector("#am-copy-order");
+    const downloadQrBtn = root.querySelector("#am-download-qr");
 
     let selectedChannelType = "ewallet";
     let selectedChannel = null;
@@ -261,14 +274,18 @@
         selectedChannel = null;
         setStatus("", null);
 
-        toggleBtns.forEach(b => b.classList.toggle("am-toggle-btn--active", b === btn));
+        toggleBtns.forEach(b =>
+          b.classList.toggle("am-toggle-btn--active", b === btn)
+        );
 
         channelGroups.forEach(group => {
           const gType = group.getAttribute("data-channel-type");
           const isActive = gType === selectedChannelType;
           group.classList.toggle("am-hidden", !isActive);
           if (!isActive) {
-            group.querySelectorAll('input[type="radio"]').forEach(r => (r.checked = false));
+            group
+              .querySelectorAll('input[type="radio"]')
+              .forEach(r => (r.checked = false));
           }
         });
 
@@ -278,15 +295,17 @@
 
     // Channel selection
     channelGroups.forEach(group => {
-      group.querySelectorAll('input[type="radio"]').forEach(radio => {
-        radio.addEventListener("change", () => {
-          if (radio.checked) {
-            selectedChannel = radio.value;
-            setStatus("", null);
-            updatePayButtonState();
-          }
+      group
+        .querySelectorAll('input[type="radio"]')
+        .forEach(radio => {
+          radio.addEventListener("change", () => {
+            if (radio.checked) {
+              selectedChannel = radio.value;
+              setStatus("", null);
+              updatePayButtonState();
+            }
+          });
         });
-      });
     });
 
     // Validate inputs
@@ -303,6 +322,31 @@
         setStatus("Order ID copied to clipboard.", "success");
       } catch {
         setStatus("Unable to copy Order ID. Please copy manually.", "error");
+      }
+    });
+
+    // Download QR (white canvas with quiet space)
+    downloadQrBtn.addEventListener("click", () => {
+      if (!qrContainer) return;
+      const canvas = qrContainer.querySelector("canvas");
+      if (!canvas) {
+        setStatus("QR is not ready to download yet.", "error");
+        return;
+      }
+
+      try {
+        const link = document.createElement("a");
+        link.href = canvas.toDataURL("image/png");
+        link.download = currentOrderId
+          ? `qr-${currentOrderId}.png`
+          : "qr-payment.png";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setStatus("QR downloaded successfully.", "success");
+      } catch (e) {
+        console.error("[AM PAY] Failed to download QR:", e);
+        setStatus("Could not download QR. Please try again.", "error");
       }
     });
 
@@ -377,7 +421,9 @@
             body: JSON.stringify(payload)
           });
 
-          if (!res.ok) throw new Error("Webhook request failed with " + res.status);
+          if (!res.ok) {
+            throw new Error("Webhook request failed with " + res.status);
+          }
 
           const data = await res.json();
           logDebug("Webhook response:", data);
@@ -392,9 +438,8 @@
           }
 
           finalizeQR(code, orderId);
-
         } else if (CONFIG.staticCode) {
-          logDebug("Using static QR payload from data-am-static-code");
+          logDebug("Using static QR payload from config");
           setTimeout(function () {
             finalizeQR(CONFIG.staticCode, null);
           }, 400);
@@ -453,7 +498,9 @@
           buildUI(root);
         } else if (elapsed >= maxMs) {
           clearInterval(poll);
-          logDebug("Timed out waiting for .product-cost-total div .order-total");
+          logDebug(
+            "Timed out waiting for .product-cost-total div .order-total"
+          );
         }
       }, intervalMs);
     }, 3000);
@@ -467,7 +514,8 @@
       return;
     }
     const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+    s.src =
+      "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
     s.onload = cb;
     s.onerror = function () {
       console.error("[AM PAY] Failed to load qrcode.js");
@@ -480,7 +528,10 @@
     loadQRCodeLibIfNeeded(mountAfterDelay);
   }
 
-  if (document.readyState === "complete" || document.readyState === "interactive") {
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
     start();
   } else {
     document.addEventListener("DOMContentLoaded", start);
