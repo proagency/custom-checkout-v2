@@ -188,7 +188,6 @@
       </button>
     </div>
 
-    <!-- 🔻 New actions row with Download QR button -->
     <div class="am-qr-actions">
       <button type="button" id="am-download-qr" class="am-secondary-btn">
         <i class="fa-solid fa-download"></i> Download QR
@@ -519,4 +518,5 @@ downloadQrBtn.addEventListener("click", () => {
     document.addEventListener("DOMContentLoaded", start);
   }
 })();
+
 
