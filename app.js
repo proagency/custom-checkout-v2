@@ -33,7 +33,8 @@
     email: ".form-body div input[type=text]:nth-child(2)",
     phone: ".form-body div input[type=tel]",
     itemName: ".product-cost-total .item span",
-    orderTotal: ".order-total .item .item-price"
+    orderTotal: ".order-total .item .item-price",
+    stepOneButton: ".form-body div .form-btn" // 2-step: next/continue on step 1
   };
 
   function qs(selector, ctx) {
@@ -82,6 +83,23 @@
         cachedPhone = phoneInput.value.trim();
       });
     }
+  }
+
+  // Bind Step 1 button (2-step order) to capture contact values on click
+  function bindStepOneButtonCapture() {
+    const btn = qs(SELECTORS.stepOneButton);
+    if (!btn || btn.dataset.amCaptureBound === "1") return;
+
+    btn.dataset.amCaptureBound = "1";
+
+    btn.addEventListener("click", function () {
+      captureContactValues();
+      logDebug("Captured contact values on Step 1 button click:", {
+        fullName: cachedFullName,
+        email: cachedEmail,
+        phone: cachedPhone
+      });
+    });
   }
 
   // Local fallback orderId when no webhook
@@ -419,11 +437,30 @@
     }
 
     function updatePayButtonState() {
-      const nameOk = !!getFullName();
-      const emailOk = !!getEmail();
-      const phoneOk = !!getPhone();
+      const name = getFullName();
+      const email = getEmail();
+      const phone = getPhone();
+
+      const hasAnyContactField =
+        !!fullNameInput ||
+        !!emailInput ||
+        !!phoneInput ||
+        !!cachedFullName ||
+        !!cachedEmail ||
+        !!cachedPhone;
+
+      let contactOk;
+      if (hasAnyContactField) {
+        // we have (or had) contact fields → require all 3
+        contactOk = !!name && !!email && !!phone;
+      } else {
+        // true hard 2-step where we never see contact fields at all
+        contactOk = true;
+      }
+
       const channelOk = !!selectedChannelType && !!selectedChannel;
-      payBtn.disabled = !(nameOk && emailOk && phoneOk && channelOk);
+
+      payBtn.disabled = !(contactOk && channelOk);
     }
 
     // Toggle eWallet / Bank
@@ -700,6 +737,7 @@
       const observer = new MutationObserver(function () {
         ensurePaymentUIMounted();
         captureContactValues();
+        bindStepOneButtonCapture();
       });
 
       observer.observe(document.body, {
@@ -732,6 +770,7 @@
   function start() {
     loadQRCodeLibIfNeeded(function () {
       captureContactValues();
+      bindStepOneButtonCapture();
       mountAfterDelayOnce();
       setupMutationObserver();
     });
