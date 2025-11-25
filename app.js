@@ -29,7 +29,7 @@
 
   const SELECTORS = {
     host: ".product-cost-total div .order-total", // inject UI after this
-    fullName: ".info div input[type=text]",
+    fullName: ".info div input[type=text], .form-body div input[type=text]:nth-child(1)",
     email: ".form-body div input[type=text]:nth-child(2)",
     phone: ".form-body div input[type=tel]",
     itemName: ".product-cost-total .item span",
@@ -785,3 +785,4 @@
     document.addEventListener("DOMContentLoaded", start);
   }
 })();
+
