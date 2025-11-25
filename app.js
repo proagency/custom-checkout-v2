@@ -29,12 +29,24 @@
 
   const SELECTORS = {
     host: ".product-cost-total div .order-total", // inject UI after this
-    fullName: ".info div input[type=text], .form-body div input[type=text]:nth-child(1)",
+
+    // Full name: support both 1-step and 2-step
+    // 1-step: .info div input[type=text]
+    // 2-step: .form-body div input[type=text]:nth-child(1)
+    fullName:
+      ".info div input[type=text], .form-body div input[type=text]:nth-child(1)",
+
+    // Email (common GHL pattern on both layouts)
     email: ".form-body div input[type=text]:nth-child(2)",
+
+    // Phone
     phone: ".form-body div input[type=tel]",
+
     itemName: ".product-cost-total .item span",
     orderTotal: ".order-total .item .item-price",
-    stepOneButton: ".form-body div .form-btn" // 2-step: next/continue on step 1
+
+    // Step 1 button (2-step order) – "Next / Continue"
+    stepOneButton: ".form-body div .form-btn"
   };
 
   function qs(selector, ctx) {
@@ -55,10 +67,84 @@
   let cachedEmail = null;
   let cachedPhone = null;
 
+  // More robust full name finder
+  function findFullNameInput() {
+    // Try explicit selectors first
+    let el = qs(SELECTORS.fullName);
+    if (el) return el;
+
+    // Fallback: look for a likely name input
+    const candidates = Array.from(
+      document.querySelectorAll(
+        ".info input[type='text'], .form-body input[type='text']"
+      )
+    );
+
+    if (!candidates.length) return null;
+
+    // Prefer inputs whose current value looks like a name (non-empty, not email)
+    let best = null;
+    for (const c of candidates) {
+      const val = (c.value || "").trim();
+      if (!val) continue;
+      if (val.includes("@")) continue; // probably email
+      if (!best) best = c;
+    }
+
+    return best || candidates[0];
+  }
+
+  function findEmailInput() {
+    let el = qs(SELECTORS.email);
+    if (el) return el;
+
+    // Fallback: look for email-like input
+    const candidates = Array.from(
+      document.querySelectorAll(
+        ".form-body input[type='email'], .info input[type='email'], .form-body input[type='text'], .info input[type='text']"
+      )
+    );
+
+    for (const c of candidates) {
+      const val = (c.value || "").trim();
+      if (val.includes("@")) return c;
+      const ph = (c.placeholder || "").toLowerCase();
+      if (ph.includes("email")) return c;
+    }
+
+    return null;
+  }
+
+  function findPhoneInput() {
+    let el = qs(SELECTORS.phone);
+    if (el) return el;
+
+    const candidates = Array.from(
+      document.querySelectorAll(
+        ".form-body input[type='tel'], .info input[type='tel']"
+      )
+    );
+    if (candidates.length) return candidates[0];
+
+    // Fallback: look for number-like input that looks like phone
+    const textCandidates = Array.from(
+      document.querySelectorAll(".form-body input[type='text']")
+    );
+
+    for (const c of textCandidates) {
+      const ph = (c.placeholder || "").toLowerCase();
+      if (ph.includes("phone") || ph.includes("mobile") || ph.includes("contact")) {
+        return c;
+      }
+    }
+
+    return null;
+  }
+
   function captureContactValues() {
-    const nameInput = qs(SELECTORS.fullName);
-    const emailInput = qs(SELECTORS.email);
-    const phoneInput = qs(SELECTORS.phone);
+    const nameInput = findFullNameInput();
+    const emailInput = findEmailInput();
+    const phoneInput = findPhoneInput();
 
     if (nameInput && !nameInput.dataset.amBound) {
       nameInput.dataset.amBound = "1";
@@ -83,6 +169,12 @@
         cachedPhone = phoneInput.value.trim();
       });
     }
+
+    logDebug("captureContactValues", {
+      cachedFullName,
+      cachedEmail,
+      cachedPhone
+    });
   }
 
   // Bind Step 1 button (2-step order) to capture contact values on click
@@ -361,9 +453,9 @@
 
   // === UI LOGIC ==========================================================
   function wireUpLogic(root) {
-    const fullNameInput = qs(SELECTORS.fullName);
-    const emailInput = qs(SELECTORS.email);
-    const phoneInput = qs(SELECTORS.phone);
+    const fullNameInput = findFullNameInput();
+    const emailInput = findEmailInput();
+    const phoneInput = findPhoneInput();
     const itemNameEl = qs(SELECTORS.itemName);
     const orderTotalEl = qs(SELECTORS.orderTotal);
 
@@ -451,16 +543,26 @@
 
       let contactOk;
       if (hasAnyContactField) {
-        // we have (or had) contact fields → require all 3
+        // We have (or had) contact fields → require all 3
         contactOk = !!name && !!email && !!phone;
       } else {
-        // true hard 2-step where we never see contact fields at all
+        // True hard 2-step where we never see contact fields at all
         contactOk = true;
       }
 
       const channelOk = !!selectedChannelType && !!selectedChannel;
 
       payBtn.disabled = !(contactOk && channelOk);
+
+      logDebug("updatePayButtonState", {
+        name,
+        email,
+        phone,
+        hasAnyContactField,
+        contactOk,
+        channelOk,
+        disabled: payBtn.disabled
+      });
     }
 
     // Toggle eWallet / Bank
@@ -785,4 +887,3 @@
     document.addEventListener("DOMContentLoaded", start);
   }
 })();
-
