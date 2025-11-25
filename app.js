@@ -24,29 +24,13 @@
     console.log.apply(console, ["[AM PAY]"].concat(Array.from(arguments)));
   }
 
-  // === DOM SELECTORS (GHL checkout) ======================================
+  // === DOM SELECTORS ======================================
   const ROOT_ID = "am-payment-root";
 
   const SELECTORS = {
     host: ".product-cost-total div .order-total", // inject UI after this
-
-    // Full name: support both 1-step and 2-step
-    // 1-step: .info div input[type=text]
-    // 2-step: .form-body div input[type=text]:nth-child(1)
-    fullName:
-      ".info div input[type=text], .form-body div input[type=text]:nth-child(1)",
-
-    // Email (common GHL pattern on both layouts)
-    email: ".form-body div input[type=text]:nth-child(2)",
-
-    // Phone
-    phone: ".form-body div input[type=tel]",
-
     itemName: ".product-cost-total .item span",
-    orderTotal: ".order-total .item .item-price",
-
-    // Step 1 button (2-step order) – "Next / Continue"
-    stepOneButton: ".form-body div .form-btn"
+    orderTotal: ".order-total .item .item-price"
   };
 
   function qs(selector, ctx) {
@@ -59,149 +43,94 @@
     if (!numeric) return null;
     const value = parseFloat(numeric);
     if (isNaN(value)) return null;
-    return value; // 500.00 as number
+    return value;
   }
 
-  // === CONTACT CACHE FOR 2-STEP FORMS ====================================
-  let cachedFullName = null;
-  let cachedEmail = null;
-  let cachedPhone = null;
+  // === BEST-EFFORT CONTACT HELPERS (NO BLOCKING) =========================
+  function findFullName() {
+    // 1-step
+    const byInfo = document.querySelector(".info div input[type=text]");
+    if (byInfo && byInfo.value.trim()) return byInfo.value.trim();
 
-  // More robust full name finder
-  function findFullNameInput() {
-    // Try explicit selectors first
-    let el = qs(SELECTORS.fullName);
-    if (el) return el;
+    // 2-step-ish: first text input in form-body
+    const byFormBodyFirst = document.querySelector(
+      ".form-body div input[type=text]:nth-child(1)"
+    );
+    if (byFormBodyFirst && byFormBodyFirst.value.trim())
+      return byFormBodyFirst.value.trim();
 
-    // Fallback: look for a likely name input
+    // fallback: any text input that doesn't look like email
     const candidates = Array.from(
       document.querySelectorAll(
-        ".info input[type='text'], .form-body input[type='text']"
+        ".info input[type=text], .form-body input[type=text]"
       )
     );
-
-    if (!candidates.length) return null;
-
-    // Prefer inputs whose current value looks like a name (non-empty, not email)
-    let best = null;
     for (const c of candidates) {
       const val = (c.value || "").trim();
       if (!val) continue;
       if (val.includes("@")) continue; // probably email
-      if (!best) best = c;
+      return val;
     }
-
-    return best || candidates[0];
-  }
-
-  function findEmailInput() {
-    let el = qs(SELECTORS.email);
-    if (el) return el;
-
-    // Fallback: look for email-like input
-    const candidates = Array.from(
-      document.querySelectorAll(
-        ".form-body input[type='email'], .info input[type='email'], .form-body input[type='text'], .info input[type='text']"
-      )
-    );
-
-    for (const c of candidates) {
-      const val = (c.value || "").trim();
-      if (val.includes("@")) return c;
-      const ph = (c.placeholder || "").toLowerCase();
-      if (ph.includes("email")) return c;
-    }
-
     return null;
   }
 
-  function findPhoneInput() {
-    let el = qs(SELECTORS.phone);
-    if (el) return el;
+  function findEmail() {
+    const byType = document.querySelector(
+      ".form-body input[type=email], .info input[type=email]"
+    );
+    if (byType && byType.value.trim()) return byType.value.trim();
+
+    const byTextNth = document.querySelector(
+      ".form-body div input[type=text]:nth-child(2)"
+    );
+    if (byTextNth && byTextNth.value.trim() && byTextNth.value.includes("@"))
+      return byTextNth.value.trim();
+
+    const textCandidates = Array.from(
+      document.querySelectorAll(
+        ".info input[type=text], .form-body input[type=text]"
+      )
+    );
+    for (const c of textCandidates) {
+      const val = (c.value || "").trim();
+      if (val && val.includes("@")) return val;
+      const ph = (c.placeholder || "").toLowerCase();
+      if (ph.includes("email")) return val || null;
+    }
+    return null;
+  }
+
+  function findPhone() {
+    const byTel = document.querySelector(
+      ".form-body input[type=tel], .info input[type=tel]"
+    );
+    if (byTel && byTel.value.trim()) return byTel.value.trim();
 
     const candidates = Array.from(
       document.querySelectorAll(
-        ".form-body input[type='tel'], .info input[type='tel']"
+        ".form-body input[type=text], .info input[type=text]"
       )
     );
-    if (candidates.length) return candidates[0];
-
-    // Fallback: look for number-like input that looks like phone
-    const textCandidates = Array.from(
-      document.querySelectorAll(".form-body input[type='text']")
-    );
-
-    for (const c of textCandidates) {
+    for (const c of candidates) {
       const ph = (c.placeholder || "").toLowerCase();
-      if (ph.includes("phone") || ph.includes("mobile") || ph.includes("contact")) {
-        return c;
+      if (
+        ph.includes("phone") ||
+        ph.includes("mobile") ||
+        ph.includes("contact")
+      ) {
+        const val = (c.value || "").trim();
+        if (val) return val;
       }
     }
-
     return null;
   }
 
-  function captureContactValues() {
-    const nameInput = findFullNameInput();
-    const emailInput = findEmailInput();
-    const phoneInput = findPhoneInput();
-
-    if (nameInput && !nameInput.dataset.amBound) {
-      nameInput.dataset.amBound = "1";
-      cachedFullName = nameInput.value.trim() || cachedFullName;
-      nameInput.addEventListener("input", () => {
-        cachedFullName = nameInput.value.trim();
-      });
-    }
-
-    if (emailInput && !emailInput.dataset.amBound) {
-      emailInput.dataset.amBound = "1";
-      cachedEmail = emailInput.value.trim() || cachedEmail;
-      emailInput.addEventListener("input", () => {
-        cachedEmail = emailInput.value.trim();
-      });
-    }
-
-    if (phoneInput && !phoneInput.dataset.amBound) {
-      phoneInput.dataset.amBound = "1";
-      cachedPhone = phoneInput.value.trim() || cachedPhone;
-      phoneInput.addEventListener("input", () => {
-        cachedPhone = phoneInput.value.trim();
-      });
-    }
-
-    logDebug("captureContactValues", {
-      cachedFullName,
-      cachedEmail,
-      cachedPhone
-    });
-  }
-
-  // Bind Step 1 button (2-step order) to capture contact values on click
-  function bindStepOneButtonCapture() {
-    const btn = qs(SELECTORS.stepOneButton);
-    if (!btn || btn.dataset.amCaptureBound === "1") return;
-
-    btn.dataset.amCaptureBound = "1";
-
-    btn.addEventListener("click", function () {
-      captureContactValues();
-      logDebug("Captured contact values on Step 1 button click:", {
-        fullName: cachedFullName,
-        email: cachedEmail,
-        phone: cachedPhone
-      });
-    });
-  }
-
-  // Local fallback orderId when no webhook
+  // === ORDER ID + EMV HELPERS ============================================
   function amGenerateLocalOrderId() {
     const ts = Date.now().toString(36).toUpperCase();
     const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-    return "QR-" + ts + "-" + rand; // e.g. QR-MBKF3K-8F2A
+    return "QR-" + ts + "-" + rand;
   }
-
-  // === EMV TLV PARSING & CRC =============================================
 
   function parseEmv(emv) {
     const fields = [];
@@ -210,9 +139,7 @@
       const tag = emv.slice(i, i + 2);
       const lenStr = emv.slice(i + 2, i + 4);
       const len = parseInt(lenStr, 10);
-      if (isNaN(len) || i + 4 + len > emv.length) {
-        break;
-      }
+      if (isNaN(len) || i + 4 + len > emv.length) break;
       const value = emv.slice(i + 4, i + 4 + len);
       fields.push({ tag, value });
       i += 4 + len;
@@ -249,13 +176,12 @@
     if (!baseEmv || typeof baseEmv !== "string") {
       throw new Error("Base EMV string is missing or invalid.");
     }
-
     const fields = parseEmv(baseEmv);
     if (!fields.length) {
       throw new Error("Could not parse EMV template.");
     }
 
-    const formatted = amountNumber.toFixed(2); // e.g. 500.00
+    const formatted = amountNumber.toFixed(2);
 
     let amountField = fields.find(f => f.tag === "54");
     if (amountField) {
@@ -263,11 +189,8 @@
     } else {
       const crcIndex = fields.findIndex(f => f.tag === "63");
       const newField = { tag: "54", value: formatted };
-      if (crcIndex === -1) {
-        fields.push(newField);
-      } else {
-        fields.splice(crcIndex, 0, newField);
-      }
+      if (crcIndex === -1) fields.push(newField);
+      else fields.splice(crcIndex, 0, newField);
     }
 
     const baseWithoutCrc = buildEmvWithoutCRC(fields);
@@ -275,8 +198,7 @@
     const crc = crc16Ccitt(forCrc);
     const crcHex = crc.toString(16).toUpperCase().padStart(4, "0");
 
-    const finalEmv = baseWithoutCrc + "63" + "04" + crcHex;
-    return finalEmv;
+    return baseWithoutCrc + "63" + "04" + crcHex;
   }
 
   function getMerchantFromBaseEmv() {
@@ -300,12 +222,11 @@
 
     container.innerHTML = "";
     const size = 220;
-
     const tempDiv = document.createElement("div");
     container.appendChild(tempDiv);
 
     new QRCode(tempDiv, {
-      text: text,
+      text,
       width: size,
       height: size,
       colorDark: "#000000",
@@ -361,51 +282,10 @@
           Pay via QR
         </h3>
         <p class="am-subtitle">
-          Choose your payment channel, then generate a QR code to complete your payment.
+          Generate a QR code based on your order total and pay using your wallet or banking app.
         </p>
 
-        <div class="am-toggle-group">
-          <button type="button" class="am-toggle-btn am-toggle-btn--active" data-channel-type="ewallet">
-            <i class="fa-solid fa-wallet"></i>
-            eWallet
-          </button>
-          <button type="button" class="am-toggle-btn" data-channel-type="bank">
-            <i class="fa-solid fa-building-columns"></i>
-            Bank Transfer
-          </button>
-        </div>
-
-        <div class="am-channel-group" data-channel-type="ewallet">
-          <label class="am-option">
-            <input type="radio" name="am-channel" value="GCash" />
-            <span>GCash</span>
-          </label>
-          <label class="am-option">
-            <input type="radio" name="am-channel" value="Maya" />
-            <span>Maya</span>
-          </label>
-        </div>
-
-        <div class="am-channel-group am-hidden" data-channel-type="bank">
-          <label class="am-option">
-            <input type="radio" name="am-channel" value="BPI" />
-            <span>BPI</span>
-          </label>
-          <label class="am-option">
-            <input type="radio" name="am-channel" value="BDO" />
-            <span>BDO</span>
-          </label>
-          <label class="am-option">
-            <input type="radio" name="am-channel" value="RCBC" />
-            <span>RCBC</span>
-          </label>
-          <label class="am-option">
-            <input type="radio" name="am-channel" value="UNIONBANK" />
-            <span>UNIONBANK</span>
-          </label>
-        </div>
-
-        <button type="button" id="am-pay-btn" class="am-primary-btn" disabled>
+        <button type="button" id="am-pay-btn" class="am-primary-btn">
           <span class="am-btn-label">Pay via QR Now</span>
           <span class="am-btn-spinner am-hidden">
             <i class="fa-solid fa-spinner fa-spin"></i>
@@ -453,15 +333,9 @@
 
   // === UI LOGIC ==========================================================
   function wireUpLogic(root) {
-    const fullNameInput = findFullNameInput();
-    const emailInput = findEmailInput();
-    const phoneInput = findPhoneInput();
     const itemNameEl = qs(SELECTORS.itemName);
     const orderTotalEl = qs(SELECTORS.orderTotal);
 
-    const toggleGroup = root.querySelector(".am-toggle-group");
-    const toggleBtns = root.querySelectorAll(".am-toggle-btn");
-    const channelGroups = root.querySelectorAll(".am-channel-group");
     const payBtn = root.querySelector("#am-pay-btn");
     const payLabel = root.querySelector(".am-btn-label");
     const paySpinner = root.querySelector(".am-btn-spinner");
@@ -478,35 +352,12 @@
     const copyOrderBtn = root.querySelector("#am-copy-order");
     const downloadQrBtn = root.querySelector("#am-download-qr");
 
-    let selectedChannelType = "ewallet";
-    let selectedChannel = null;
     let currentOrderId = null;
     let currentQrCode = null;
 
     const baseMerchantName = getMerchantFromBaseEmv();
     if (merchantValueSpan && baseMerchantName) {
       merchantValueSpan.textContent = baseMerchantName;
-    }
-
-    function getFullName() {
-      if (fullNameInput && fullNameInput.value.trim()) {
-        return fullNameInput.value.trim();
-      }
-      return cachedFullName || "";
-    }
-
-    function getEmail() {
-      if (emailInput && emailInput.value.trim()) {
-        return emailInput.value.trim();
-      }
-      return cachedEmail || "";
-    }
-
-    function getPhone() {
-      if (phoneInput && phoneInput.value.trim()) {
-        return phoneInput.value.trim();
-      }
-      return cachedPhone || "";
     }
 
     function setStatus(message, type) {
@@ -522,76 +373,11 @@
         payLabel.classList.add("am-hidden");
         paySpinner.classList.remove("am-hidden");
       } else {
+        payBtn.disabled = false;
         payLabel.classList.remove("am-hidden");
         paySpinner.classList.add("am-hidden");
-        updatePayButtonState();
       }
     }
-
-    function updatePayButtonState() {
-  // Only require channel selection. GHL handles required contact fields on its side.
-  const channelOk = !!selectedChannelType && !!selectedChannel;
-
-  payBtn.disabled = !channelOk;
-
-  logDebug("updatePayButtonState", {
-    fullName: getFullName(),
-    email: getEmail(),
-    phone: getPhone(),
-    channelType: selectedChannelType,
-    channel: selectedChannel,
-    disabled: payBtn.disabled
-  });
-}
-
-
-    // Toggle eWallet / Bank
-    toggleBtns.forEach(btn => {
-      btn.addEventListener("click", () => {
-        const type = btn.getAttribute("data-channel-type");
-        if (!type || type === selectedChannelType) return;
-
-        selectedChannelType = type;
-        selectedChannel = null;
-        setStatus("", null);
-
-        toggleBtns.forEach(b =>
-          b.classList.toggle("am-toggle-btn--active", b === btn)
-        );
-
-        channelGroups.forEach(group => {
-          const gType = group.getAttribute("data-channel-type");
-          const isActive = gType === selectedChannelType;
-          group.classList.toggle("am-hidden", !isActive);
-          if (!isActive) {
-            group
-              .querySelectorAll('input[type="radio"]')
-              .forEach(r => (r.checked = false));
-          }
-        });
-
-        updatePayButtonState();
-      });
-    });
-
-    // Channel selection
-    channelGroups.forEach(group => {
-      group.querySelectorAll('input[type="radio"]').forEach(radio => {
-        radio.addEventListener("change", () => {
-          if (radio.checked) {
-            selectedChannel = radio.value;
-            setStatus("", null);
-            updatePayButtonState();
-          }
-        });
-      });
-    });
-
-    // Input listeners (only if visible on this step)
-    [fullNameInput, emailInput, phoneInput].forEach(input => {
-      if (!input) return;
-      input.addEventListener("input", updatePayButtonState);
-    });
 
     // Copy order ID
     copyOrderBtn.addEventListener("click", async () => {
@@ -633,12 +419,9 @@
       }
     });
 
-    // Pay via QR Now (hybrid: local EMV + optional webhook)
+    // Pay via QR Now
+    payBtn.disabled = false; // never blocked by contact fields
     payBtn.addEventListener("click", async () => {
-      if (payBtn.disabled) return;
-
-      setStatus("", null);
-
       if (!CONFIG.baseEmv) {
         setStatus(
           "No base EMV template configured. Please add data-am-base-emv on the script tag.",
@@ -647,8 +430,7 @@
         return;
       }
 
-      if (toggleGroup) toggleGroup.classList.add("am-hidden");
-      channelGroups.forEach(group => group.classList.add("am-hidden"));
+      setStatus("", null);
 
       qrSection.classList.remove("am-hidden");
       qrSkeleton.classList.remove("am-hidden");
@@ -667,13 +449,13 @@
       }
 
       try {
-        // 1️⃣ Always generate EMV & QR locally
         logDebug("Base EMV:", CONFIG.baseEmv);
         logDebug("Parsed amount from DOM:", amountNumber);
 
         const finalEmv = regenerateEmvWithAmount(CONFIG.baseEmv, amountNumber);
         currentQrCode = finalEmv;
 
+        // Render QR
         renderQrWithQuietZone(qrContainer, finalEmv);
 
         // Merchant: start with base merchant
@@ -697,29 +479,28 @@
           qrContent.classList.remove("am-hidden");
         }, 200);
 
-        payBtn.classList.add("am-hidden");
-
         setStatus(
           "Scan the QR code with your payment app to complete the payment.",
           "success"
         );
 
-        // 2️⃣ Optional webhook for logging/overrides
+        // Optional webhook for logging / overrides
         if (CONFIG.webhookUrl) {
+          setPayLoading(true);
+
           const payload = {
-            fullName: getFullName() || null,
-            email: getEmail() || null,
-            phone: getPhone() || null,
+            fullName: findFullName(),
+            email: findEmail(),
+            phone: findPhone(),
             amount: amountNumber,
             amountFormatted: amountNumber.toFixed(2),
-            channelType: selectedChannelType,
-            channel: selectedChannel,
+            channelType: null,
+            channel: null,
             merchant: baseMerchantName || null,
             itemName: itemNameEl ? itemNameEl.textContent.trim() : null
           };
 
           logDebug("Sending webhook payload:", payload);
-          setPayLoading(true);
 
           try {
             const res = await fetch(CONFIG.webhookUrl, {
@@ -777,11 +558,9 @@
         );
       }
     });
-
-    updatePayButtonState();
   }
 
-  // === ENSURE UI MOUNTED (INITIAL + MUTATIONS) ===========================
+  // === ENSURE UI MOUNTED ================================================
   function ensurePaymentUIMounted() {
     const host = qs(SELECTORS.host);
     if (!host) {
@@ -806,7 +585,7 @@
     logDebug("Mounted #am-payment-root under host.");
   }
 
-  // === MOUNTING: PAGE LOAD + DELAY + MUTATION OBSERVER ===================
+  // === MOUNTING: PAGE LOAD + MUTATION OBSERVER ===========================
   function mountAfterDelayOnce() {
     logDebug("Scheduling initial mount ~3s after page load…");
     setTimeout(function () {
@@ -818,8 +597,6 @@
     try {
       const observer = new MutationObserver(function () {
         ensurePaymentUIMounted();
-        captureContactValues();
-        bindStepOneButtonCapture();
       });
 
       observer.observe(document.body, {
@@ -827,7 +604,7 @@
         subtree: true
       });
 
-      logDebug("MutationObserver attached for re-mounting + contact capture.");
+      logDebug("MutationObserver attached for re-mounting.");
     } catch (e) {
       console.error("[AM PAY] Failed to attach MutationObserver:", e);
     }
@@ -851,8 +628,6 @@
 
   function start() {
     loadQRCodeLibIfNeeded(function () {
-      captureContactValues();
-      bindStepOneButtonCapture();
       mountAfterDelayOnce();
       setupMutationObserver();
     });
@@ -867,5 +642,3 @@
     document.addEventListener("DOMContentLoaded", start);
   }
 })();
-
-
