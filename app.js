@@ -529,41 +529,21 @@
     }
 
     function updatePayButtonState() {
-      const name = getFullName();
-      const email = getEmail();
-      const phone = getPhone();
+  // Only require channel selection. GHL handles required contact fields on its side.
+  const channelOk = !!selectedChannelType && !!selectedChannel;
 
-      const hasAnyContactField =
-        !!fullNameInput ||
-        !!emailInput ||
-        !!phoneInput ||
-        !!cachedFullName ||
-        !!cachedEmail ||
-        !!cachedPhone;
+  payBtn.disabled = !channelOk;
 
-      let contactOk;
-      if (hasAnyContactField) {
-        // We have (or had) contact fields → require all 3
-        contactOk = !!name && !!email && !!phone;
-      } else {
-        // True hard 2-step where we never see contact fields at all
-        contactOk = true;
-      }
+  logDebug("updatePayButtonState", {
+    fullName: getFullName(),
+    email: getEmail(),
+    phone: getPhone(),
+    channelType: selectedChannelType,
+    channel: selectedChannel,
+    disabled: payBtn.disabled
+  });
+}
 
-      const channelOk = !!selectedChannelType && !!selectedChannel;
-
-      payBtn.disabled = !(contactOk && channelOk);
-
-      logDebug("updatePayButtonState", {
-        name,
-        email,
-        phone,
-        hasAnyContactField,
-        contactOk,
-        channelOk,
-        disabled: payBtn.disabled
-      });
-    }
 
     // Toggle eWallet / Bank
     toggleBtns.forEach(btn => {
@@ -887,3 +867,4 @@
     document.addEventListener("DOMContentLoaded", start);
   }
 })();
+
